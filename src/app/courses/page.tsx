@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useCourses, CourseCategory } from "@/hooks/useCourses";
+import { useCourses, Course } from "@/hooks/useCourses";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input, Select } from "@/components/ui/Input";
@@ -11,34 +11,65 @@ import { Badge } from "@/components/ui/Badge";
 import { IconCheckCircle } from "@/components/Icons";
 
 export default function CoursesPage() {
-    const { courses, isLoaded, addCourse, incrementProgress, deleteCourse } = useCourses();
-    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const { courses, isLoaded, addCourse, updateCourse, incrementProgress, deleteCourse } = useCourses();
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingId, setEditingId] = useState<string | null>(null);
 
     // Form State
     const [title, setTitle] = useState("");
     const [url, setUrl] = useState("");
     const [totalLessons, setTotalLessons] = useState("");
-    const [category, setCategory] = useState<CourseCategory>("Other");
+    const [category, setCategory] = useState("");
 
     if (!isLoaded) return null;
 
-    const handleAddCourse = (e: React.FormEvent) => {
+    const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!title || !totalLessons) return;
 
-        addCourse({
-            title,
-            url,
-            totalLessons: Number(totalLessons),
-            category,
-        });
+        if (editingId) {
+            updateCourse(editingId, {
+                title,
+                url,
+                totalLessons: Number(totalLessons),
+                category,
+            });
+        } else {
+            addCourse({
+                title,
+                url,
+                totalLessons: Number(totalLessons),
+                category,
+            });
+        }
 
-        // Reset and close
+        closeModal();
+    };
+
+    const openModal = (course?: Course) => {
+        if (course) {
+            setEditingId(course.id);
+            setTitle(course.title);
+            setUrl(course.url || "");
+            setTotalLessons(course.totalLessons.toString());
+            setCategory(course.category);
+        } else {
+            setEditingId(null);
+            setTitle("");
+            setUrl("");
+            setTotalLessons("");
+            setCategory("");
+        }
+        setIsModalOpen(true);
+    };
+
+    const closeModal = () => {
+        setIsModalOpen(false);
+        setEditingId(null);
         setTitle("");
         setUrl("");
         setTotalLessons("");
-        setCategory("Other");
-        setIsAddModalOpen(false);
+        setCategory("");
     };
 
     return (
@@ -48,14 +79,14 @@ export default function CoursesPage() {
                     <h1 className="text-3xl font-bold tracking-tight mb-2">Courses & Playlists</h1>
                     <p className="text-muted-foreground">Track your progress through your learning materials.</p>
                 </div>
-                <Button onClick={() => setIsAddModalOpen(true)}>+ Add Course</Button>
+                <Button onClick={() => openModal()}>+ Add Course</Button>
             </header>
 
             {courses.length === 0 ? (
                 <Card className="border-dashed">
                     <CardContent className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground">
                         <p className="mb-4">You haven't added any courses yet.</p>
-                        <Button variant="outline" onClick={() => setIsAddModalOpen(true)}>Add your first course</Button>
+                        <Button variant="outline" onClick={() => openModal()}>Add your first course</Button>
                     </CardContent>
                 </Card>
             ) : (
@@ -101,6 +132,13 @@ export default function CoursesPage() {
                                             {isDone ? "Completed" : "+1 Lesson"}
                                         </Button>
                                         <Button
+                                            variant="outline"
+                                            className="px-3"
+                                            onClick={() => openModal(course)}
+                                        >
+                                            Edit
+                                        </Button>
+                                        <Button
                                             variant="ghost"
                                             className="text-red-500 hover:text-red-400 hover:bg-red-500/10 px-3"
                                             onClick={() => deleteCourse(course.id)}
@@ -115,13 +153,13 @@ export default function CoursesPage() {
                 </div>
             )}
 
-            {/* Add Course Modal */}
+            {/* Add/Edit Course Modal */}
             <Modal
-                isOpen={isAddModalOpen}
-                onClose={() => setIsAddModalOpen(false)}
-                title="Add Course or Playlist"
+                isOpen={isModalOpen}
+                onClose={closeModal}
+                title={editingId ? "Edit Course" : "Add Course or Playlist"}
             >
-                <form onSubmit={handleAddCourse} className="flex flex-col gap-4">
+                <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                     <div>
                         <label className="text-sm font-medium mb-1 block">Title</label>
                         <Input
@@ -148,18 +186,17 @@ export default function CoursesPage() {
                         </div>
                         <div className="flex-1">
                             <label className="text-sm font-medium mb-1 block">Category</label>
-                            <Select
+                            <Input
+                                placeholder="e.g. Next.js, Math, etc."
                                 value={category}
-                                onChange={e => setCategory(e.target.value as CourseCategory)}
-                            >
-                                <option value="ML">Machine Learning</option>
-                                <option value="Math">Math</option>
-                                <option value="Language">Language</option>
-                                <option value="Other">Other</option>
-                            </Select>
+                                onChange={e => setCategory(e.target.value)}
+                                required
+                            />
                         </div>
                     </div>
-                    <Button type="submit" className="mt-2 text-primary-foreground">Add Course</Button>
+                    <Button type="submit" className="mt-2 text-primary-foreground">
+                        {editingId ? "Save Changes" : "Add Course"}
+                    </Button>
                 </form>
             </Modal>
         </div>

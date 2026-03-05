@@ -21,6 +21,7 @@ export function Sidebar({ className = "" }: { className?: string }) {
     const { settings, updateSettings, isLoaded } = useSettings();
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [tempTime, setTempTime] = useState("18:00");
+    const [exportSuccess, setExportSuccess] = useState(false);
 
     const openSettings = () => {
         if (isLoaded) setTempTime(settings.reminderTime);
@@ -31,6 +32,53 @@ export function Sidebar({ className = "" }: { className?: string }) {
         e.preventDefault();
         updateSettings({ reminderTime: tempTime });
         setIsSettingsOpen(false);
+    };
+
+    const exportData = () => {
+        const data: Record<string, any> = {};
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith("consistencie_")) {
+                try {
+                    data[key] = JSON.parse(localStorage.getItem(key) || "");
+                } catch {
+                    data[key] = localStorage.getItem(key);
+                }
+            }
+        }
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `consistencie_backup_${new Date().toISOString().split("T")[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+
+        setExportSuccess(true);
+        setTimeout(() => setExportSuccess(false), 3000);
+    };
+
+    const importData = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const data = JSON.parse(event.target?.result as string);
+                Object.keys(data).forEach((key) => {
+                    if (key.startsWith("consistencie_")) {
+                        localStorage.setItem(key, typeof data[key] === "string" ? data[key] : JSON.stringify(data[key]));
+                    }
+                });
+                alert("Data imported successfully! The app will now reload.");
+                window.location.reload();
+            } catch (error) {
+                alert("Failed to parse the backup file. Please make sure it is a valid consistencie backup.");
+                console.error("Import error:", error);
+            }
+        };
+        reader.readAsText(file);
     };
 
     return (
@@ -78,21 +126,52 @@ export function Sidebar({ className = "" }: { className?: string }) {
             </div>
 
             <Modal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} title="Settings">
-                <form onSubmit={saveSettings} className="flex flex-col gap-4">
-                    <div>
-                        <label className="text-sm font-medium mb-1 block">Daily Reminder Time</label>
-                        <p className="text-xs text-muted-foreground mb-3">Set a time to receive a browser push notification so you don't break your streak.</p>
-                        <Input
-                            type="time"
-                            value={tempTime}
-                            onChange={e => setTempTime(e.target.value)}
-                            required
-                        />
+                <div className="flex flex-col gap-8">
+                    <form onSubmit={saveSettings} className="flex flex-col gap-4">
+                        <div>
+                            <h3 className="font-semibold mb-2">Notifications</h3>
+                            <label className="text-sm font-medium mb-1 block">Daily Reminder Time</label>
+                            <p className="text-xs text-muted-foreground mb-3">Set a time to receive a browser push notification so you don't break your streak.</p>
+                            <Input
+                                type="time"
+                                value={tempTime}
+                                onChange={e => setTempTime(e.target.value)}
+                                required
+                            />
+                        </div>
+                        <button type="submit" className="h-10 px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg font-medium transition-colors">
+                            Save Preferences
+                        </button>
+                    </form>
+
+                    <div className="border-t border-border pt-6">
+                        <h3 className="font-semibold mb-2">Data Management (SaaS Prep)</h3>
+                        <p className="text-xs text-muted-foreground mb-4">
+                            Since consistencie currently stores everything directly in your browser, you can export your data to back it up or import it on another device.
+                            When Cloud Sync launches, you will be able to upload this backup file to your account!
+                        </p>
+
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <button
+                                onClick={exportData}
+                                type="button"
+                                className="flex-1 h-10 px-4 py-2 border border-border hover:bg-muted text-foreground rounded-lg font-medium transition-colors cursor-pointer text-sm"
+                            >
+                                {exportSuccess ? "Exported!" : "Export Backup (.json)"}
+                            </button>
+
+                            <label className="flex-1 h-10 px-4 py-2 border border-border hover:bg-muted text-foreground rounded-lg font-medium transition-colors flex items-center justify-center cursor-pointer text-sm">
+                                <span>Import Backup</span>
+                                <input
+                                    type="file"
+                                    accept=".json"
+                                    className="hidden"
+                                    onChange={importData}
+                                />
+                            </label>
+                        </div>
                     </div>
-                    <button type="submit" className="mt-2 h-10 px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg font-medium transition-colors">
-                        Save Preferences
-                    </button>
-                </form>
+                </div>
             </Modal>
         </>
     );

@@ -1,4 +1,5 @@
-import { useLocalStorage } from "./useLocalStorage";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/providers/AuthProvider";
 
 export interface StudyLogEntry {
     id: string;
@@ -9,29 +10,68 @@ export interface StudyLogEntry {
 }
 
 export function useStudyLog() {
-    const [studyLog, setStudyLog, isLoaded] = useLocalStorage<StudyLogEntry[]>("consistencie_studyLog", []);
+    const { user } = useAuth();
+    const [studyLog, setStudyLog] = useState<StudyLogEntry[]>([]);
+    const [isLoaded, setIsLoaded] = useState(false);
 
-    const addLog = (entry: Omit<StudyLogEntry, "id" | "date"> & { date?: string }) => {
+    useEffect(() => {
+        if (!user) {
+            if (user === null) setIsLoaded(true);
+            return;
+        }
+        fetch("/api/studylog")
+            .then(res => res.json())
+            .then(data => {
+                if (Array.isArray(data)) {
+                    // ensure notes mapped to note if backend mismatch
+                    const mapped = data.map(d => ({ ...d, note: d.notes || d.note }));
+                    setStudyLog(mapped);
+                }
+                setIsLoaded(true);
+            })
+            .catch(err => {
+                console.error("Failed to fetch study log", err);
+                setIsLoaded(true);
+            });
+    }, [user]);
+
+    const addLog = async (entry: Omit<StudyLogEntry, "id" | "date"> & { date?: string }) => {
+        if (!user) return;
+
         const dateStr = entry.date || new Date().toISOString().split("T")[0];
+        const tempId = crypto.randomUUID();
 
-        setStudyLog((prev) => {
-            // Check if entry for today exists, if so append or just add a new record.
-            // Easiest is to just allow multiple entries per day or sum them up. We'll append.
-            const newEntry: StudyLogEntry = {
+        const newEntryOptimistic: StudyLogEntry = {
+            ...entry,
+            id: tempId,
+            date: dateStr,
+        };
+
+        setStudyLog(prev => [...prev, newEntryOptimistic]);
+
+        try {
+            const dbEntry = {
                 ...entry,
-                id: crypto.randomUUID(),
+                notes: entry.note, // Map to schema
                 date: dateStr,
             };
-            return [...prev, newEntry];
-        });
+
+            const res = await fetch("/api/studylog", {
+                method: "POST",
+                body: JSON.stringify(dbEntry),
+            });
+            const data = await res.json();
+            const finalEntry = { ...data, note: data.notes || data.note };
+
+            setStudyLog(prev => prev.map(l => l.id === tempId ? finalEntry : l));
+        } catch (err) {
+            console.error(err);
+        }
     };
 
     const calculateStreak = () => {
         if (!studyLog.length) return 0;
-
-        // Get unique dates sorted descending
         const dates = [...new Set(studyLog.map(log => log.date))].sort((a, b) => b.localeCompare(a));
-
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const todayStr = new Date(today.getTime() - (today.getTimezoneOffset() * 60000)).toISOString().split("T")[0];
@@ -40,7 +80,6 @@ export function useStudyLog() {
         yesterday.setDate(yesterday.getDate() - 1);
         const yesterdayStr = new Date(yesterday.getTime() - (yesterday.getTimezoneOffset() * 60000)).toISOString().split("T")[0];
 
-        // If today or yesterday isn't in dates, streak is 0
         if (!dates.includes(todayStr) && !dates.includes(yesterdayStr)) {
             return 0;
         }
@@ -48,7 +87,7 @@ export function useStudyLog() {
         let streak = 0;
         let currentDate = new Date(dates.includes(todayStr) ? todayStr : yesterdayStr);
 
-        for (let i = 0; i < 3650; i++) { // cap loop just in case
+        for (let i = 0; i < 3650; i++) {
             const dStr = new Date(currentDate.getTime() - (currentDate.getTimezoneOffset() * 60000)).toISOString().split("T")[0];
             if (dates.includes(dStr)) {
                 streak++;
@@ -57,7 +96,6 @@ export function useStudyLog() {
                 break;
             }
         }
-
         return streak;
     };
 
