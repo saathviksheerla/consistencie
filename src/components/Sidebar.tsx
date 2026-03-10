@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { IconHome, IconBookOpen, IconBookmark, IconCalendar, IconMap, IconFlame } from "./Icons";
+import { IconHome, IconBookOpen, IconBookmark, IconCalendar, IconMap, IconFlame, IconUser } from "./Icons";
 import { useSettings } from "@/hooks/useSettings";
 import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
@@ -14,6 +14,7 @@ const navigation = [
     { name: "Bookmarks", href: "/bookmarks", icon: IconBookmark },
     { name: "Log", href: "/log", icon: IconCalendar },
     { name: "Roadmap", href: "/roadmap", icon: IconMap },
+    { name: "Profile", href: "/profile", icon: IconUser },
 ];
 
 export function Sidebar({ className = "" }: { className?: string }) {
