@@ -9,7 +9,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 // Wrapper hook to keep compatibility with our previous mock components
 export function useAuth() {
-    const { data: session, status } = useSession();
+    const { data: session, status, update } = useSession();
 
     const user = useMemo(() => session?.user
         ? {
@@ -17,6 +17,7 @@ export function useAuth() {
             name: session.user.name || "Student",
             email: session.user.email || "",
             isGuest: false,
+            lastUsernameUpdate: session.user.lastUsernameUpdate || undefined,
         }
         : null, [session?.user]);
 
@@ -25,5 +26,18 @@ export function useAuth() {
         isLoading: status === "loading",
         login: () => signIn("google", { callbackUrl: "/dashboard" }), // Triggers Google sign-in explicitly
         logout: () => signOut({ callbackUrl: "/" }),
+        update,
+    } as {
+        user: {
+            id: string;
+            name: string;
+            email: string;
+            isGuest: boolean;
+            lastUsernameUpdate?: string;
+        } | null;
+        isLoading: boolean;
+        login: () => void;
+        logout: () => void;
+        update: (data?: any) => Promise<any>;
     };
 }

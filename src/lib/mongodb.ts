@@ -35,21 +35,37 @@ if (process.env.NODE_ENV === "development") {
 export { clientPromise };
 
 // --- Mongoose Connection ---
-let isConnected = false;
+let globalWithMongoose = global as typeof globalThis & {
+    mongoose?: { conn: typeof mongoose | null; promise: Promise<typeof mongoose> | null };
+};
+
+let cached = globalWithMongoose.mongoose;
+
+if (!cached) {
+    cached = globalWithMongoose.mongoose = { conn: null, promise: null };
+}
 
 export const connectToDatabase = async () => {
     mongoose.set("strictQuery", true);
 
-    if (isConnected) {
-        console.log("MongoDB is already connected");
-        return;
+    if (cached.conn) {
+        return cached.conn;
+    }
+
+    if (!cached.promise) {
+        cached.promise = mongoose.connect(uri).then((mongoose) => {
+            console.log("MongoDB connected");
+            return mongoose;
+        });
     }
 
     try {
-        await mongoose.connect(uri);
-        isConnected = true;
-        console.log("MongoDB connected");
+        cached.conn = await cached.promise;
     } catch (error) {
-        console.log(error);
+        cached.promise = null;
+        console.log("Error connecting to MongoDB:", error);
+        throw error;
     }
+
+    return cached.conn;
 };

@@ -2,6 +2,7 @@ import NextAuth, { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import { MongoDBAdapter } from "@auth/mongodb-adapter";
 import { clientPromise } from "@/lib/mongodb";
+import { ObjectId } from "mongodb";
 
 export const authOptions: NextAuthOptions = {
     providers: [
@@ -20,12 +21,28 @@ export const authOptions: NextAuthOptions = {
         async session({ session, token }) {
             if (session?.user && token.sub) {
                 session.user.id = token.sub;
+                session.user.lastUsernameUpdate = token.lastUsernameUpdate as string | undefined;
             }
             return session;
         },
-        async jwt({ token, user }) {
+        async jwt({ token, user, trigger, session }) {
             if (user) {
                 token.sub = user.id;
+                // Fetch the actual user from DB to get custom fields on login
+                try {
+                    const client = await clientPromise;
+                    const db = client.db();
+                    const dbUser = await db.collection("users").findOne({ _id: new ObjectId(user.id) });
+                    if (dbUser?.lastUsernameUpdate) {
+                        token.lastUsernameUpdate = dbUser.lastUsernameUpdate;
+                    }
+                } catch (e) {
+                    console.error("Error fetching user in jwt callback", e);
+                }
+            }
+            if (trigger === "update" && session?.name) {
+                token.name = session.name;
+                token.lastUsernameUpdate = new Date().toISOString();
             }
             return token;
         },
