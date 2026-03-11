@@ -14,7 +14,7 @@ export function MobileHeader() {
                 <div className="bg-accent text-accent-foreground p-1 rounded-md">
                     <IconFlame className="w-4 h-4 text-zinc-950" />
                 </div>
-                <span className="text-lg font-bold tracking-tight text-white">consistencie</span>
+                <span className="text-lg font-bold tracking-tight text-white">consistly</span>
             </div>
 
             <div className="flex items-center">
